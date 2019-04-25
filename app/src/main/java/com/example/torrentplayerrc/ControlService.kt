@@ -15,11 +15,11 @@ import android.os.Binder
 import android.os.Build
 import android.util.Log
 import android.view.KeyEvent
-import com.github.nkzawa.socketio.client.IO
-import com.github.nkzawa.socketio.client.Socket
 import io.ktor.client.HttpClient
 import io.ktor.client.call.call
 import io.ktor.client.response.readBytes
+import io.socket.client.IO
+import io.socket.client.Socket
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch

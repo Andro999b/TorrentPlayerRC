@@ -3,7 +3,6 @@ package com.example.torrentplayerrc
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
-import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
@@ -13,14 +12,11 @@ import android.webkit.WebView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.github.nkzawa.socketio.client.IO
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 
 
 class ControlActivity : AppCompatActivity() {
