@@ -93,7 +93,6 @@ class ControlService: Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        clean()
         return START_STICKY
     }
 

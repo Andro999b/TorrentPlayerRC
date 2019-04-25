@@ -48,6 +48,7 @@ class ControlActivity : AppCompatActivity() {
             }
         }
 
+        startService(Intent(this, ControlService::class.java))
         bindService(Intent(this, ControlService::class.java), serviceConnection, BIND_AUTO_CREATE)
 
         connectingText = findViewById(R.id.connecting_text)
