@@ -313,10 +313,13 @@ class ControlService: Service() {
         activityIntent.putExtra("serverAddress", serverAddress)
         builder.setContentIntent(PendingIntent.getActivity(applicationContext, 0, activityIntent, PendingIntent.FLAG_UPDATE_CURRENT))
 
+        var buttonsCount = 0
         if (currentFileIndex > 0) {
+            buttonsCount++
             builder.addAction(createMediaAction(android.R.drawable.ic_media_previous, KeyEvent.KEYCODE_MEDIA_PREVIOUS))
         }
 
+        buttonsCount++
         if (isPlaying) {
             builder.addAction(createMediaAction(android.R.drawable.ic_media_pause, KeyEvent.KEYCODE_MEDIA_PAUSE))
         } else {
@@ -324,12 +327,14 @@ class ControlService: Service() {
         }
 
         if (currentFileIndex < files.length()) {
+            buttonsCount++
             builder.addAction(createMediaAction(android.R.drawable.ic_media_next, KeyEvent.KEYCODE_MEDIA_NEXT))
         }
 
+
         builder.style = Notification.MediaStyle()
             .setMediaSession(mediaSession.sessionToken)
-            .setShowActionsInCompactView(if(currentFileIndex > 0) 1 else 0) // show play pause btn always
+            .setShowActionsInCompactView(*(0..buttonsCount).toList().toIntArray())
 
         return builder.build()
     }
