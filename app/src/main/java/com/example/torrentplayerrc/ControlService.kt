@@ -46,6 +46,7 @@ class ControlService: Service() {
     private var lastDevice: JSONObject? = null
     private var lastDeviceId: String? = null
     private var lastDeviceState: JSONObject? = null
+    private var lastDevicesList: JSONArray? = null
     private var lastImageUrl: String? = null
     private var lastImage: Bitmap? = null
 
@@ -120,7 +121,7 @@ class ControlService: Service() {
 
         this.serverAddress = serverAddress
         rootSocket = IO.socket(serverAddress).apply {
-            bindServerEvent(this, "devicesList")
+            bindServerEvent(this, "devicesList") { lastDevicesList = it as JSONArray }
             connect()
         }
     }
@@ -141,10 +142,11 @@ class ControlService: Service() {
         deviceSocket = IO.socket("$serverAddress/control").apply {
             connect()
             emit("connectDevice", deviceId)
-            on("deviceConnected", this@ControlService::onDeviceConnected)
-            on("sync", this@ControlService::onDeviceSync)
-            on("reconnect") { emit("connectDevice", deviceId) }
+            bindServerEvent(this, "deviceConnected") { updatePlayback(it as JSONObject) }
+            bindServerEvent( this, "sync") { updatePlayback(it as JSONObject) }
             bindServerEvent(this, "deviceDisconnected")
+            on("reconnect") { emit("connectDevice", deviceId) }
+
         }
 
     }
@@ -154,16 +156,6 @@ class ControlService: Service() {
             Log.i("sendDeviceAction", payload)
             emit("action", JSONObject(payload))
         }
-    }
-
-    private fun onDeviceConnected(vararg args: Any) {
-        sendJSCommand("deviceConnected", args[0])
-        updatePlayback(args[0] as JSONObject)
-    }
-
-    private fun onDeviceSync(vararg args: Any) {
-        sendJSCommand("sync", args[0])
-        updatePlayback(args[0] as JSONObject)
     }
 
     private fun createAndSendDeviceAction(action: String, payload: Any? = null) {
@@ -185,18 +177,21 @@ class ControlService: Service() {
         lastDevice = null
         lastDeviceId = null
         lastDeviceState = null
+        lastDevicesList = null
         lastImageUrl = null
         lastImage = null
         mediaSession.isActive = true
         stopForeground(true)
     }
 
-    private fun bindServerEvent(socket: Socket, eventName: String) {
+    private fun bindServerEvent(socket: Socket, eventName: String, cb:((payload: Any?) -> Unit)? = null) {
         socket.on(eventName) {
             if(it.isNotEmpty())
                 sendJSCommand(eventName, it[0])
             else
                 sendJSCommand(eventName, null)
+
+            cb?.invoke(it[0])
         }
     }
 
@@ -368,6 +363,7 @@ class ControlService: Service() {
     inner class ControlServiceBinder: Binder() {
         var jsCallback: ((command: String, data: Any?) -> Unit)? = null
         fun getDevice() = lastDevice
+        fun getDevicesList() = lastDevicesList
         fun getService() = this@ControlService
     }
 

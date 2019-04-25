@@ -31,7 +31,7 @@ class ControlActivity : AppCompatActivity() {
     private lateinit var controlServiceBinder: ControlService.ControlServiceBinder
     private lateinit var serviceConnection: ServiceConnection
 
-    var serverAddress: String? = null;
+    private var serverAddress: String? = null;
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -117,7 +117,7 @@ class ControlActivity : AppCompatActivity() {
         cancelConnection()
     }
 
-    fun cancelConnection() {
+    private fun cancelConnection() {
         startActivity(Intent(this, MainActivity::class.java))
         finish()
     }
@@ -136,9 +136,12 @@ class ControlActivity : AppCompatActivity() {
         jsCommandListener = listener
 
         // sync current state with web app
-        val lastDevice = controlServiceBinder.getDevice()
-        if(lastDevice != null) {
-            sendJSCommand("restoreDevice", lastDevice)
+        controlServiceBinder.getDevice()?.let {
+            sendJSCommand("restoreDevice", it)
+        }
+        // sync current devices list with app
+        controlServiceBinder.getDevicesList()?.let {
+            sendJSCommand("devicesList", it)
         }
     }
 

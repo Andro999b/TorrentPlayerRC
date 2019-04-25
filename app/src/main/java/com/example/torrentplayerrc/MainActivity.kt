@@ -50,17 +50,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onStart() {
-        super.onStart()
-
-        //I just need to stop service somehow and do some service cleanup. But android is so shite...
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(Intent(this, ControlService::class.java))
-        } else {
-            startService(Intent(this, ControlService::class.java))
-        }
-    }
-
     private fun onServerDelete(pos: Int) {
         servers.removeAt(pos)
         serverAddressAdapter.notifyItemRangeRemoved(pos, 1)
