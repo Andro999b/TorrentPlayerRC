@@ -1,6 +1,5 @@
 package com.example.torrentplayerrc
 
-import android.R
 import android.app.*
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -35,7 +34,7 @@ class ControlService: Service() {
     private var rootSocket: Socket? = null
     private var serverAddress: String? = null
 
-    lateinit var mediaSession: MediaSession
+    private lateinit var mediaSession: MediaSession
     private val playbackStateBuilder = PlaybackState.Builder().setActions(
          PlaybackState.ACTION_PLAY
          or PlaybackState.ACTION_PAUSE
@@ -44,6 +43,8 @@ class ControlService: Service() {
     )
 
     private var deviceSocket: Socket? = null
+    private var lastDevice: JSONObject? = null
+    private var lastDeviceId: String? = null
     private var lastDeviceState: JSONObject? = null
     private var lastImageUrl: String? = null
     private var lastImage: Bitmap? = null
@@ -91,9 +92,11 @@ class ControlService: Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        clean()
         return START_STICKY
     }
 
+    // go to next or previous file in a playlist
     private fun offsetPlaylist(offset: Int) {
         lastDeviceState?.run {
             if(has("playlist") && has("currentFileIndex")) {
@@ -122,15 +125,28 @@ class ControlService: Service() {
         }
     }
 
-    fun connectToDevice(deviceId: String) {
+    fun connectToDevice(deviceStr: String) {
+        val device = JSONObject(deviceStr)
+        val deviceId = device.getString("id")
+
+        if(lastDeviceId == deviceId) { // if we already connected to this device just pass last state to ui
+            sendJSCommand("deviceConnected", lastDeviceState)
+            return
+        }
+
+        lastDeviceId = deviceId
+        lastDevice = device
+
         deviceSocket?.close()
         deviceSocket = IO.socket("$serverAddress/control").apply {
             connect()
             emit("connectDevice", deviceId)
             on("deviceConnected", this@ControlService::onDeviceConnected)
             on("sync", this@ControlService::onDeviceSync)
+            on("reconnect") { emit("connectDevice", deviceId) }
             bindServerEvent(this, "deviceDisconnected")
         }
+
     }
 
     fun sendDeviceAction(payload: String) {
@@ -138,6 +154,16 @@ class ControlService: Service() {
             Log.i("sendDeviceAction", payload)
             emit("action", JSONObject(payload))
         }
+    }
+
+    private fun onDeviceConnected(vararg args: Any) {
+        sendJSCommand("deviceConnected", args[0])
+        updatePlayback(args[0] as JSONObject)
+    }
+
+    private fun onDeviceSync(vararg args: Any) {
+        sendJSCommand("sync", args[0])
+        updatePlayback(args[0] as JSONObject)
     }
 
     private fun createAndSendDeviceAction(action: String, payload: Any? = null) {
@@ -156,6 +182,8 @@ class ControlService: Service() {
     fun disconnectDevice() {
         Log.i("disconnectDevice", "closing socket")
         deviceSocket?.close()
+        lastDevice = null
+        lastDeviceId = null
         lastDeviceState = null
         lastImageUrl = null
         lastImage = null
@@ -176,16 +204,6 @@ class ControlService: Service() {
         binder.jsCallback?.invoke(command, data)
     }
 
-    private fun onDeviceConnected(vararg args: Any) {
-        sendJSCommand("deviceConnected", args[0])
-        updatePlayback(args[0] as JSONObject)
-    }
-
-    private fun onDeviceSync(vararg args: Any) {
-        sendJSCommand("sync", args[0])
-        updatePlayback(args[0] as JSONObject)
-    }
-
     private fun updatePlayback(newState: JSONObject) {
         // check if state change enough to update notification
         val shouldCreateNewNotification =
@@ -197,7 +215,7 @@ class ControlService: Service() {
         if(lastDeviceState == null){
             lastDeviceState = newState
         } else {
-            newState.keys().forEach { key: Any? ->
+            newState.keys().forEach { key: Any? -> // Why type info lost? Shame on you kotlin. Shame!!!
                 lastDeviceState!!.put(key as String, newState[key])
             }
         }
@@ -215,6 +233,7 @@ class ControlService: Service() {
     private fun createPlaybackNotification(deviceState: JSONObject) {
         if(!deviceState.has("playlist")) return
 
+        // extract params from state
         val isPlaying = deviceState.getBoolean("isPlaying")
         val currentFileIndex = deviceState.getInt("currentFileIndex")
         val playlist = deviceState.getJSONObject("playlist")
@@ -226,6 +245,7 @@ class ControlService: Service() {
         val track = file.getString("name")
 
         GlobalScope.launch(Dispatchers.IO) {
+            // load video poster
             val image: Bitmap? = imageUrl?.let {
                 if (it == lastImageUrl) return@let lastImage
 
@@ -239,6 +259,7 @@ class ControlService: Service() {
 
             val notification = createNotification(isPlaying, artist, track, image, currentFileIndex, files)
 
+            // setup media session
             mediaSession.isActive = true
             mediaSession.setPlaybackState(
                 playbackStateBuilder.setState(
@@ -249,6 +270,7 @@ class ControlService: Service() {
                     .build()
             )
 
+            // add metadata
             val metadata = MediaMetadata.Builder()
                 .putBitmap(MediaMetadata.METADATA_KEY_ART, image)
                 .putString(MediaMetadata.METADATA_KEY_TITLE, track)
@@ -276,9 +298,9 @@ class ControlService: Service() {
         }
 
         val playbackIcon = if (isPlaying)
-            R.drawable.ic_media_play
+            android.R.drawable.ic_media_play
         else
-            R.drawable.ic_media_pause
+            android.R.drawable.ic_media_pause
 
         builder.setContentTitle(artist)
         builder.setContentText(track)
@@ -293,25 +315,26 @@ class ControlService: Service() {
 
         // actions
         val activityIntent = Intent(applicationContext, ControlActivity::class.java)
-        builder.setContentIntent(PendingIntent.getActivity(applicationContext, 0, activityIntent, 0))
+        activityIntent.putExtra("serverAddress", serverAddress)
+        builder.setContentIntent(PendingIntent.getActivity(applicationContext, 0, activityIntent, PendingIntent.FLAG_UPDATE_CURRENT))
 
         if (currentFileIndex > 0) {
-            builder.addAction(createMediaAction(R.drawable.ic_media_previous, KeyEvent.KEYCODE_MEDIA_PREVIOUS))
+            builder.addAction(createMediaAction(android.R.drawable.ic_media_previous, KeyEvent.KEYCODE_MEDIA_PREVIOUS))
         }
 
         if (isPlaying) {
-            builder.addAction(createMediaAction(R.drawable.ic_media_pause, KeyEvent.KEYCODE_MEDIA_PAUSE))
+            builder.addAction(createMediaAction(android.R.drawable.ic_media_pause, KeyEvent.KEYCODE_MEDIA_PAUSE))
         } else {
-            builder.addAction(createMediaAction(R.drawable.ic_media_play, KeyEvent.KEYCODE_MEDIA_PLAY))
+            builder.addAction(createMediaAction(android.R.drawable.ic_media_play, KeyEvent.KEYCODE_MEDIA_PLAY))
         }
 
         if (currentFileIndex < files.length()) {
-            builder.addAction(createMediaAction(R.drawable.ic_media_next, KeyEvent.KEYCODE_MEDIA_NEXT))
+            builder.addAction(createMediaAction(android.R.drawable.ic_media_next, KeyEvent.KEYCODE_MEDIA_NEXT))
         }
 
         builder.style = Notification.MediaStyle()
             .setMediaSession(mediaSession.sessionToken)
-            .setShowActionsInCompactView(if(currentFileIndex > 0) 1 else 0) // show playpause btn always
+            .setShowActionsInCompactView(if(currentFileIndex > 0) 1 else 0) // show play pause btn always
 
         return builder.build()
     }
@@ -322,6 +345,7 @@ class ControlService: Service() {
         val intent = Intent(Intent.ACTION_MEDIA_BUTTON)
         intent.putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(KeyEvent.ACTION_DOWN, action))
 
+        //WTF magic with 'requestCode' params here. Android please stop being so shite
         val pendingIntent = PendingIntent.getBroadcast(applicationContext, action, intent, 0)
 
         return Notification.Action.Builder(icon, "", pendingIntent).build()
@@ -343,7 +367,7 @@ class ControlService: Service() {
     private val binder = ControlServiceBinder()
     inner class ControlServiceBinder: Binder() {
         var jsCallback: ((command: String, data: Any?) -> Unit)? = null
-        fun getDeviceState() = lastDeviceState
+        fun getDevice() = lastDevice
         fun getService() = this@ControlService
     }
 

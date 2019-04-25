@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Patterns
 import android.view.View
@@ -51,7 +52,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        stopService(Intent(this, ControlService::class.java))
+
+        //I just need to stop service somehow and do some service cleanup. But android is so shite...
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(Intent(this, ControlService::class.java))
+        } else {
+            startService(Intent(this, ControlService::class.java))
+        }
     }
 
     private fun onServerDelete(pos: Int) {
@@ -62,6 +69,7 @@ class MainActivity : AppCompatActivity() {
     private fun onServerSelect(pos: Int) {
         val intent = Intent(this, ControlActivity::class.java)
         intent.putExtra("serverAddress", servers[pos])
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
         startActivity(intent)
     }
 

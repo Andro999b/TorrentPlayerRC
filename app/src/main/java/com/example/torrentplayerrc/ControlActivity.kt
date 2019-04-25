@@ -24,10 +24,14 @@ import org.json.JSONObject
 
 
 class ControlActivity : AppCompatActivity() {
-    lateinit var webView: WebView
-    lateinit var jsCommandListener: String
-    lateinit var controlServiceBinder: ControlService.ControlServiceBinder
-    lateinit var serviceConnection: ServiceConnection
+    private lateinit var webView: WebView
+    private lateinit var connectingText: TextView
+    private lateinit var connectingContainer: View
+    private lateinit var jsCommandListener: String
+    private lateinit var controlServiceBinder: ControlService.ControlServiceBinder
+    private lateinit var serviceConnection: ServiceConnection
+
+    var serverAddress: String? = null;
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,18 +50,44 @@ class ControlActivity : AppCompatActivity() {
 
         bindService(Intent(this, ControlService::class.java), serviceConnection, BIND_AUTO_CREATE)
 
-        val serverAddress = intent.extras.getString("serverAddress")
+        connectingText = findViewById(R.id.connecting_text)
+        connectingContainer = findViewById<View>(R.id.connecting)
 
-        findViewById<TextView>(R.id.connecting_text).text = getString(R.string.connecting, serverAddress)
+        WebView.setWebContentsDebuggingEnabled(true)
+
         webView = findViewById(R.id.web_view)
+        webView.settings.javaScriptEnabled = true
+        webView.addJavascriptInterface(this, "mobileApp")
+
+        this.onNewIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+
+        val serverAddress = intent?.extras?.getString("serverAddress")
+        if(serverAddress == null) {
+            cancelConnection()
+        }
+
+        if(this.serverAddress == serverAddress) return
+        this.serverAddress = serverAddress
+
+        connectingContainer.visibility = View.VISIBLE
+        connectingText.text = getString(R.string.connecting, serverAddress)
+        webView.loadUrl("about:blank")
+        webView.visibility = View.INVISIBLE
 
         GlobalScope.launch(Dispatchers.IO) {
             try {
                 HttpClient().use {client ->
-                    val page = client.get<String>(serverAddress)
+                    val page = client.get<String>(serverAddress!!)
                     runOnUiThread {
-                        findViewById<View>(R.id.connecting).visibility = View.GONE
-                        initWebView(serverAddress, page)
+                        connectingContainer.visibility = View.INVISIBLE
+
+                        webView.loadDataWithBaseURL(serverAddress, page, "text/html", "utf-8", null)
+                        webView.visibility = View.VISIBLE
+
                         controlServiceBinder.getService().startWebSocket(serverAddress)
                     }
                 }
@@ -78,15 +108,17 @@ class ControlActivity : AppCompatActivity() {
         unbindService(serviceConnection)
     }
 
-    private fun initWebView(serverAddress: String?, page: String) {
-        WebView.setWebContentsDebuggingEnabled(true)
-
-        webView.settings.javaScriptEnabled = true
-        webView.addJavascriptInterface(this, "mobileApp")
-        webView.loadDataWithBaseURL(serverAddress, page, "text/html", "utf-8", null)
+    override fun onBackPressed() {
+        super.onBackPressed()
+        cancelConnection()
     }
 
-    fun onCancelConnection(view: View) {
+    fun onCancelConnection(view: View?) {
+        cancelConnection()
+    }
+
+    fun cancelConnection() {
+        startActivity(Intent(this, MainActivity::class.java))
         finish()
     }
 
@@ -102,11 +134,17 @@ class ControlActivity : AppCompatActivity() {
     @JavascriptInterface
     fun setCommandListener(listener: String) {
         jsCommandListener = listener
+
+        // sync current state with web app
+        val lastDevice = controlServiceBinder.getDevice()
+        if(lastDevice != null) {
+            sendJSCommand("restoreDevice", lastDevice)
+        }
     }
 
     @JavascriptInterface
-    fun connectToDevice(deviceId: String) {
-        controlServiceBinder.getService().connectToDevice(deviceId)
+    fun connectToDevice(device: String) {
+        controlServiceBinder.getService().connectToDevice(device)
     }
 
     @JavascriptInterface
