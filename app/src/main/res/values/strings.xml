@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">TorrentPlayerRC</string>
+    <string name="enter_address">Enter Address</string>
+    <string name="server_address">Server Address</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">delete</string>
+    <string name="flash_on">Flash [ON]</string>
+    <string name="flash_off">Flash [OFF]</string>
+    <string name="auto_focus_on">Auto Focus [ON]</string>
+    <string name="auto_focus_off">Auto Focus [OFF]</string>
+    <string name="select_camera">Select a Camera</string>
+    <string name="fail_to_load_page">Fail to load page</string>
+    <string name="connecting">Connecting to %1$s</string>
+</resources>
