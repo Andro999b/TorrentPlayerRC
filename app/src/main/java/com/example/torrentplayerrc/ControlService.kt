@@ -25,6 +25,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.lang.Exception
 
 
 const val NOTIFICATION_CHANNEL_ID = "TorrentPlayerRC"
@@ -243,9 +244,13 @@ class ControlService: Service() {
             val image: Bitmap? = imageUrl?.let {
                 if (it == lastImageUrl) return@let lastImage
 
-                lastImage = HttpClient().use { client ->
-                    val imageBytes = client.call(imageUrl).response.readBytes()
-                    BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                try {
+                    lastImage = HttpClient().use { client ->
+                        val imageBytes = client.call(imageUrl).response.readBytes()
+                        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                    }
+                } catch (ex: Exception)  {
+                    Log.e("Fail to load poster", ex.message)
                 }
                 lastImageUrl = imageUrl
                 lastImage
@@ -269,9 +274,9 @@ class ControlService: Service() {
                 .putBitmap(MediaMetadata.METADATA_KEY_ART, image)
                 .putString(MediaMetadata.METADATA_KEY_TITLE, track)
                 .putString(MediaMetadata.METADATA_KEY_ALBUM, artist)
-                .build();
+                .build()
 
-            mediaSession.setMetadata(metadata);
+            mediaSession.setMetadata(metadata)
 
             startForeground(NOTIFICATION_ID, notification)
         }
@@ -318,18 +323,16 @@ class ControlService: Service() {
             builder.addAction(createMediaAction(android.R.drawable.ic_media_previous, KeyEvent.KEYCODE_MEDIA_PREVIOUS))
         }
 
-        buttonsCount++
         if (isPlaying) {
             builder.addAction(createMediaAction(android.R.drawable.ic_media_pause, KeyEvent.KEYCODE_MEDIA_PAUSE))
         } else {
             builder.addAction(createMediaAction(android.R.drawable.ic_media_play, KeyEvent.KEYCODE_MEDIA_PLAY))
         }
 
-        if (currentFileIndex < files.length()) {
+        if (currentFileIndex < files.length() - 1) {
             buttonsCount++
             builder.addAction(createMediaAction(android.R.drawable.ic_media_next, KeyEvent.KEYCODE_MEDIA_NEXT))
         }
-
 
         builder.style = Notification.MediaStyle()
             .setMediaSession(mediaSession.sessionToken)
