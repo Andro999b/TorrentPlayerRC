@@ -13,6 +13,7 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Binder
 import android.os.Build
+import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
 import io.ktor.client.HttpClient
@@ -82,6 +83,14 @@ class ControlService: Service() {
             override fun onSkipToNext() {
                 offsetPlaylist(1)
             }
+
+            override fun onFastForward() {
+                seekIncremental(10.0)
+            }
+
+            override fun onRewind() {
+                seekIncremental(-10.0)
+            }
         })
 
         applicationContext.registerReceiver(mediaKeysReceiver, IntentFilter(Intent.ACTION_MEDIA_BUTTON))
@@ -114,6 +123,22 @@ class ControlService: Service() {
         }
     }
 
+    private fun seekIncremental(offset: Double) {
+        lastDeviceState?.run {
+            if(has("currentTime") && has("duration")) {
+                val currentTime = getDouble("currentTime")
+                val duration = getDouble("duration")
+
+                var newTime = currentTime + offset
+
+                if(newTime < 0) newTime = 0.0
+                else if(newTime > duration) newTime = duration
+
+                createAndSendDeviceAction("seek", newTime)
+            }
+        }
+    }
+
     fun startWebSocket(serverAddress: String) {
         if(this.serverAddress == serverAddress) return
 
@@ -123,6 +148,19 @@ class ControlService: Service() {
         rootSocket = IO.socket(serverAddress).apply {
             bindServerEvent(this, "devicesList") { lastDevicesList = it as JSONArray }
             connect()
+            on("disconnect") {
+                val reason = it[0] as String
+                if(reason === "io server disconnect") {
+                    //stop activity
+                    val activityIntent = Intent(applicationContext, ControlActivity::class.java)
+                    val bundle = Bundle()
+                    bundle.putString("serverAddress", null)
+                    activityIntent.putExtras(bundle)
+                    applicationContext.startActivity(activityIntent)
+                    //clean state
+                    clean()
+                }
+            }
         }
     }
 
@@ -317,26 +355,27 @@ class ControlService: Service() {
         activityIntent.putExtra("serverAddress", serverAddress)
         builder.setContentIntent(PendingIntent.getActivity(applicationContext, 0, activityIntent, PendingIntent.FLAG_UPDATE_CURRENT))
 
-        var buttonsCount = 0
+        var starBtn = 0
         if (currentFileIndex > 0) {
-            buttonsCount++
+            starBtn++
             builder.addAction(createMediaAction(android.R.drawable.ic_media_previous, KeyEvent.KEYCODE_MEDIA_PREVIOUS))
         }
 
+        builder.addAction(createMediaAction(android.R.drawable.ic_media_rew, KeyEvent.KEYCODE_MEDIA_REWIND))
         if (isPlaying) {
             builder.addAction(createMediaAction(android.R.drawable.ic_media_pause, KeyEvent.KEYCODE_MEDIA_PAUSE))
         } else {
             builder.addAction(createMediaAction(android.R.drawable.ic_media_play, KeyEvent.KEYCODE_MEDIA_PLAY))
         }
+        builder.addAction(createMediaAction(android.R.drawable.ic_media_ff, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD))
 
         if (currentFileIndex < files.length() - 1) {
-            buttonsCount++
             builder.addAction(createMediaAction(android.R.drawable.ic_media_next, KeyEvent.KEYCODE_MEDIA_NEXT))
         }
 
         builder.style = Notification.MediaStyle()
             .setMediaSession(mediaSession.sessionToken)
-            .setShowActionsInCompactView(*(0..buttonsCount).toList().toIntArray())
+            .setShowActionsInCompactView(*(starBtn..(starBtn + 2)).toList().toIntArray())
 
         return builder.build()
     }
