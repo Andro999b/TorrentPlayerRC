@@ -283,7 +283,11 @@ class ControlService: Service() {
 
         val imageUrl: String? = playlist.optString("image")
         val artist = playlist.getString("name")
-        val track = file.getString("name")
+        val track =
+            if(files.length() == 1)
+                file.getString("name")
+            else
+                "${currentFileIndex + 1} / ${files.length()}"
 
         GlobalScope.launch(Dispatchers.IO) {
             // load video poster
