@@ -42,6 +42,9 @@ class ControlService: Service() {
          or PlaybackState.ACTION_PAUSE
          or PlaybackState.ACTION_SKIP_TO_NEXT
          or PlaybackState.ACTION_SKIP_TO_PREVIOUS
+         or PlaybackState.ACTION_FAST_FORWARD
+         or PlaybackState.ACTION_REWIND
+         or PlaybackState.ACTION_STOP
     )
 
     private var deviceSocket: Socket? = null
@@ -90,6 +93,11 @@ class ControlService: Service() {
 
             override fun onRewind() {
                 seekIncremental(-10.0)
+            }
+
+            override fun onStop() { // close device on stop
+                disconnectDevice()
+                sendJSCommand("deviceClosed", null)
             }
         })
 
@@ -355,12 +363,6 @@ class ControlService: Service() {
         activityIntent.putExtra("serverAddress", serverAddress)
         builder.setContentIntent(PendingIntent.getActivity(applicationContext, 0, activityIntent, PendingIntent.FLAG_UPDATE_CURRENT))
 
-        var starBtn = 0
-        if (currentFileIndex > 0) {
-            starBtn++
-            builder.addAction(createMediaAction(android.R.drawable.ic_media_previous, KeyEvent.KEYCODE_MEDIA_PREVIOUS))
-        }
-
         builder.addAction(createMediaAction(android.R.drawable.ic_media_rew, KeyEvent.KEYCODE_MEDIA_REWIND))
         if (isPlaying) {
             builder.addAction(createMediaAction(android.R.drawable.ic_media_pause, KeyEvent.KEYCODE_MEDIA_PAUSE))
@@ -370,12 +372,12 @@ class ControlService: Service() {
         builder.addAction(createMediaAction(android.R.drawable.ic_media_ff, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD))
 
         if (currentFileIndex < files.length() - 1) {
-            builder.addAction(createMediaAction(android.R.drawable.ic_media_next, KeyEvent.KEYCODE_MEDIA_NEXT))
+            builder.addAction(createMediaAction(android.R.drawable.ic_menu_close_clear_cancel, KeyEvent.KEYCODE_MEDIA_STOP))
         }
 
         builder.style = Notification.MediaStyle()
             .setMediaSession(mediaSession.sessionToken)
-            .setShowActionsInCompactView(*(starBtn..(starBtn + 2)).toList().toIntArray())
+            .setShowActionsInCompactView(0, 1, 2)
 
         return builder.build()
     }
@@ -412,7 +414,6 @@ class ControlService: Service() {
         fun getDevicesList() = lastDevicesList
         fun getService() = this@ControlService
     }
-
 
     override fun onBind(intent: Intent?) = binder
 }
