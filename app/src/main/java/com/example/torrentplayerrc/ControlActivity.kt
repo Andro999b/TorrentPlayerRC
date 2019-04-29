@@ -103,6 +103,7 @@ class ControlActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         unbindService(serviceConnection)
+        serverAddress = null
     }
 
     override fun onBackPressed() {

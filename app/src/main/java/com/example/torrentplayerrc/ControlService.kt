@@ -376,8 +376,10 @@ class ControlService: Service() {
         builder.addAction(createMediaAction(android.R.drawable.ic_media_ff, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD))
 
         if (currentFileIndex < files.length() - 1) {
-            builder.addAction(createMediaAction(android.R.drawable.ic_menu_close_clear_cancel, KeyEvent.KEYCODE_MEDIA_STOP))
+            builder.addAction(createMediaAction(android.R.drawable.ic_media_next, KeyEvent.KEYCODE_MEDIA_NEXT))
         }
+
+        builder.addAction(createMediaAction(android.R.drawable.ic_menu_close_clear_cancel, KeyEvent.KEYCODE_MEDIA_STOP))
 
         builder.style = Notification.MediaStyle()
             .setMediaSession(mediaSession.sessionToken)
