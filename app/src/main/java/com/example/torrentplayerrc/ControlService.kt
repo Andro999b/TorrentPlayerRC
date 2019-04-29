@@ -18,12 +18,11 @@ import android.util.Log
 import android.view.KeyEvent
 import io.ktor.client.HttpClient
 import io.ktor.client.call.call
+import io.ktor.client.engine.android.Android
 import io.ktor.client.response.readBytes
 import io.socket.client.IO
 import io.socket.client.Socket
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
 import java.lang.Exception
@@ -49,11 +48,14 @@ class ControlService: Service() {
 
     private var deviceSocket: Socket? = null
     private var lastDevice: JSONObject? = null
+
+    @Volatile
     private var lastDeviceId: String? = null
     private var lastDeviceState: JSONObject? = null
     private var lastDevicesList: JSONArray? = null
     private var lastImageUrl: String? = null
     private var lastImage: Bitmap? = null
+    private var notificationJob: Job? = null
 
     override fun onCreate() {
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -227,6 +229,8 @@ class ControlService: Service() {
         lastImageUrl = null
         lastImage = null
         mediaSession.isActive = true
+        notificationJob?.cancel()
+        notificationJob = null
         stopForeground(true)
     }
 
@@ -289,47 +293,68 @@ class ControlService: Service() {
             else
                 "${currentFileIndex + 1} / ${files.length()}"
 
-        GlobalScope.launch(Dispatchers.IO) {
-            // load video poster
-            val image: Bitmap? = imageUrl?.let {
-                if (it == lastImageUrl) return@let lastImage
+        if(lastImageUrl != imageUrl) {
+            lastImageUrl = imageUrl
+            GlobalScope.launch(newFixedThreadPoolContext(1, "Load Image Thread")) {
+                // load video poster
+                val image: Bitmap? = imageUrl?.let {
+                    if (lastImage != null) return@let lastImage
 
-                try {
-                    lastImage = HttpClient().use { client ->
-                        val imageBytes = client.call(imageUrl).response.readBytes()
-                        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                    try {
+                        lastImage = HttpClient(Android) {
+                            engine {
+                                connectTimeout = 30_000
+                                socketTimeout = 30_000
+                            }
+                        }.use { client ->
+                            val imageBytes = client.call(imageUrl).response.readBytes()
+                            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                        }
+                    } catch (ex: Exception) {
+                        Log.e("Fail to load poster", ex.message)
                     }
-                } catch (ex: Exception)  {
-                    Log.e("Fail to load poster", ex.message)
+                    lastImage
                 }
-                lastImageUrl = imageUrl
-                lastImage
+
+                if (this@ControlService.lastDeviceId != null)
+                    showNotification(isPlaying, artist, track, image, currentFileIndex, files)
             }
-
-            val notification = createNotification(isPlaying, artist, track, image, currentFileIndex, files)
-
-            // setup media session
-            mediaSession.isActive = true
-            mediaSession.setPlaybackState(
-                playbackStateBuilder.setState(
-                    if(isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
-                    PlaybackState.PLAYBACK_POSITION_UNKNOWN,
-                    1f
-                )
-                    .build()
-            )
-
-            // add metadata
-            val metadata = MediaMetadata.Builder()
-                .putBitmap(MediaMetadata.METADATA_KEY_ART, image)
-                .putString(MediaMetadata.METADATA_KEY_TITLE, track)
-                .putString(MediaMetadata.METADATA_KEY_ALBUM, artist)
-                .build()
-
-            mediaSession.setMetadata(metadata)
-
-            startForeground(NOTIFICATION_ID, notification)
         }
+
+        showNotification(isPlaying, artist, track, null, currentFileIndex, files)
+    }
+
+    private fun showNotification(
+        isPlaying: Boolean,
+        artist: String?,
+        track: String?,
+        image: Bitmap?,
+        currentFileIndex: Int,
+        files: JSONArray
+    ) {
+        val notification = createNotification(isPlaying, artist, track, image, currentFileIndex, files)
+
+        // setup media session
+        mediaSession.isActive = true
+        mediaSession.setPlaybackState(
+            playbackStateBuilder.setState(
+                if (isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
+                PlaybackState.PLAYBACK_POSITION_UNKNOWN,
+                1f
+            )
+                .build()
+        )
+
+        // add metadata
+        val metadata = MediaMetadata.Builder()
+            .putBitmap(MediaMetadata.METADATA_KEY_ART, image)
+            .putString(MediaMetadata.METADATA_KEY_TITLE, track)
+            .putString(MediaMetadata.METADATA_KEY_ALBUM, artist)
+            .build()
+
+        mediaSession.setMetadata(metadata)
+
+        startForeground(NOTIFICATION_ID, notification)
     }
 
     private fun createNotification(

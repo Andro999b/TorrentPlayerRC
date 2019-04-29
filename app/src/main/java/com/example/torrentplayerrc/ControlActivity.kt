@@ -13,10 +13,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.android.Android
 import io.ktor.client.request.get
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 
 
 class ControlActivity : AppCompatActivity() {
@@ -28,6 +27,7 @@ class ControlActivity : AppCompatActivity() {
     private lateinit var serviceConnection: ServiceConnection
 
     private var serverAddress: String? = null;
+    private var loadPageJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,9 +75,14 @@ class ControlActivity : AppCompatActivity() {
         webView.loadUrl("about:blank")
         webView.visibility = View.INVISIBLE
 
-        GlobalScope.launch(Dispatchers.IO) {
+        loadPageJob = GlobalScope.launch(newFixedThreadPoolContext(1, "Load Page Thread")) {
             try {
-                HttpClient().use {client ->
+                HttpClient(Android) {
+                    engine {
+                        connectTimeout = 30_000
+                        socketTimeout = 30_000
+                    }
+                } .use { client ->
                     val page = client.get<String>(serverAddress!!)
                     runOnUiThread {
                         connectingContainer.visibility = View.INVISIBLE
@@ -104,6 +109,8 @@ class ControlActivity : AppCompatActivity() {
         super.onDestroy()
         unbindService(serviceConnection)
         serverAddress = null
+        loadPageJob?.cancel()
+        loadPageJob = null
     }
 
     override fun onBackPressed() {
