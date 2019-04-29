@@ -54,6 +54,7 @@ class ControlService: Service() {
     private var lastDeviceState: JSONObject? = null
     private var lastDevicesList: JSONArray? = null
     private var lastImageUrl: String? = null
+    @Volatile
     private var lastImage: Bitmap? = null
     private var notificationJob: Job? = null
 
@@ -297,11 +298,9 @@ class ControlService: Service() {
             lastImageUrl = imageUrl
             GlobalScope.launch(newFixedThreadPoolContext(1, "Load Image Thread")) {
                 // load video poster
-                val image: Bitmap? = imageUrl?.let {
-                    if (lastImage != null) return@let lastImage
-
+               lastImage = imageUrl?.let {
                     try {
-                        lastImage = HttpClient(Android) {
+                        HttpClient(Android) {
                             engine {
                                 connectTimeout = 30_000
                                 socketTimeout = 30_000
@@ -312,16 +311,16 @@ class ControlService: Service() {
                         }
                     } catch (ex: Exception) {
                         Log.e("Fail to load poster", ex.message)
+                        null
                     }
-                    lastImage
                 }
 
-                if (this@ControlService.lastDeviceId != null)
-                    showNotification(isPlaying, artist, track, image, currentFileIndex, files)
+                if (lastDeviceId != null)
+                    showNotification(isPlaying, artist, track, lastImage, currentFileIndex, files)
             }
         }
 
-        showNotification(isPlaying, artist, track, null, currentFileIndex, files)
+        showNotification(isPlaying, artist, track, lastImage, currentFileIndex, files)
     }
 
     private fun showNotification(
