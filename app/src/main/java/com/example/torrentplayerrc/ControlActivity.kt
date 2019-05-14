@@ -48,7 +48,7 @@ class ControlActivity : AppCompatActivity() {
         bindService(Intent(this, ControlService::class.java), serviceConnection, BIND_AUTO_CREATE)
 
         connectingText = findViewById(R.id.connecting_text)
-        connectingContainer = findViewById<View>(R.id.connecting)
+        connectingContainer = findViewById(R.id.connecting)
 
         WebView.setWebContentsDebuggingEnabled(true)
 

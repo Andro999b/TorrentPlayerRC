@@ -91,11 +91,11 @@ class ControlService: Service() {
             }
 
             override fun onFastForward() {
-                seekIncremental(10.0)
+                skip(10.0)
             }
 
             override fun onRewind() {
-                seekIncremental(-10.0)
+                skip(-10.0)
             }
 
             override fun onStop() { // close device on stop
@@ -134,18 +134,10 @@ class ControlService: Service() {
         }
     }
 
-    private fun seekIncremental(offset: Double) {
+    private fun skip(offset: Double) {
         lastDeviceState?.run {
             if(has("currentTime") && has("duration")) {
-                val currentTime = getDouble("currentTime")
-                val duration = getDouble("duration")
-
-                var newTime = currentTime + offset
-
-                if(newTime < 0) newTime = 0.0
-                else if(newTime > duration) newTime = duration
-
-                createAndSendDeviceAction("seek", newTime)
+                createAndSendDeviceAction("skip", offset)
             }
         }
     }
@@ -162,15 +154,11 @@ class ControlService: Service() {
             on("disconnect") {
                 val reason = it[0] as String
                 if(reason === "io server disconnect") {
-                    //stop activity
-                    val activityIntent = Intent(applicationContext, ControlActivity::class.java)
-                    val bundle = Bundle()
-                    bundle.putString("serverAddress", null)
-                    activityIntent.putExtras(bundle)
-                    applicationContext.startActivity(activityIntent)
-                    //clean state
-                    clean()
+                    stopActivbityAndClean()
                 }
+            }
+            on("reconnect_failed") {
+                stopActivbityAndClean()
             }
         }
     }
@@ -197,7 +185,6 @@ class ControlService: Service() {
             on("reconnect") { emit("connectDevice", deviceId) }
 
         }
-
     }
 
     fun sendDeviceAction(payload: String) {
@@ -212,6 +199,17 @@ class ControlService: Service() {
             Log.i("sendDeviceAction", "action: $action")
             emit("action", JSONObject(mapOf("action" to action, "payload" to payload)))
         }
+    }
+
+    private fun stopActivbityAndClean() {
+        //stop activity
+        val activityIntent = Intent(applicationContext, ControlActivity::class.java)
+        val bundle = Bundle()
+        bundle.putString("serverAddress", null)
+        activityIntent.putExtras(bundle)
+        applicationContext.startActivity(activityIntent)
+        //clean state
+        clean()
     }
 
     private fun clean() {
