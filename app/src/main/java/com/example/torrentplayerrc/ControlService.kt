@@ -4,6 +4,7 @@ import android.app.*
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -120,16 +121,9 @@ class ControlService: Service() {
     // go to next or previous file in a playlist
     private fun offsetPlaylist(offset: Int) {
         lastDeviceState?.run {
-            if(has("playlist") && has("currentFileIndex")) {
+            if(has("currentFileIndex")) {
                 val currentFileIndex = getInt("currentFileIndex")
-                val files = getJSONObject("playlist").getJSONArray("files")
-
-                var newIndex = currentFileIndex + offset
-
-                if(newIndex < 0) newIndex = 0
-                else if(newIndex > files.length() - 1) newIndex = files.length() - 1
-
-                createAndSendDeviceAction("selectFile", newIndex)
+                createAndSendDeviceAction("selectFile", currentFileIndex + offset)
             }
         }
     }
@@ -153,12 +147,15 @@ class ControlService: Service() {
             connect()
             on("disconnect") {
                 val reason = it[0] as String
-                if(reason === "io server disconnect") {
-                    stopActivbityAndClean()
+                when(reason) {
+                    "io server disconnect" -> stopActivityAndClean()
+                    "transport error" -> stopActivityAndClean()
                 }
+                Log.i("socket","disconnect: ${reason}")
             }
             on("reconnect_failed") {
-                stopActivbityAndClean()
+                stopActivityAndClean()
+                Log.i("socket","reconnect_failed")
             }
         }
     }
@@ -201,12 +198,13 @@ class ControlService: Service() {
         }
     }
 
-    private fun stopActivbityAndClean() {
+    private fun stopActivityAndClean() {
         //stop activity
         val activityIntent = Intent(applicationContext, ControlActivity::class.java)
         val bundle = Bundle()
         bundle.putString("serverAddress", null)
         activityIntent.putExtras(bundle)
+        activityIntent.flags = FLAG_ACTIVITY_NEW_TASK
         applicationContext.startActivity(activityIntent)
         //clean state
         clean()

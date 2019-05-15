@@ -55,8 +55,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onServerSelect(pos: Int) {
+        connectToServer(servers[pos])
+    }
+
+    private fun connectToServer(server: String) {
         val intent = Intent(this, ControlActivity::class.java)
-        intent.putExtra("serverAddress", servers[pos])
+        intent.putExtra("serverAddress", server)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
         startActivity(intent)
     }
@@ -101,8 +105,8 @@ class MainActivity : AppCompatActivity() {
         if (Patterns.WEB_URL.matcher(url).matches()) {
             if(!servers.contains(url)) {
                 servers.add(0, url)
-                serverAddressAdapter.notifyItemInserted(0)
             }
+            connectToServer(url)
         } else {
             Toast.makeText(this, "Invalid url", Toast.LENGTH_SHORT).show()
         }
