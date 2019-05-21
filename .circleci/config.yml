@@ -28,16 +28,16 @@ jobs:
           destination: app.apk
 
       - persist_to_workspace:
-          root: .
+          root: ./app/build/outputs
           paths:
-            - "app/build/outputs/apk/debug/app-debug.apk"
+            - "apk/debug/app-debug.apk"
 
   publish-github-release:
     docker:
       - image: cibuilds/github:0.10
     steps:
       - attach_workspace:
-          at: /tmp/repo/app/build/outputs/apk/
+          at: app/build/outputs
       - run:
           name: "Publish Release on GitHub"
           command: |
