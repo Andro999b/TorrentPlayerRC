@@ -28,7 +28,7 @@ jobs:
           destination: app.apk
 
       - persist_to_workspace:
-          root: /tmp/repo
+          root: .
           paths:
             - "app/build/outputs/apk/debug/app-debug.apk"
 
