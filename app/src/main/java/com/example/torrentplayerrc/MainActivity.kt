@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
 
         preferences = getSharedPreferences("TorrentPlayerRC", Context.MODE_PRIVATE)
         servers.addAll(
-            preferences.getString(SERVERS_KEY, "")
+            preferences.getString(SERVERS_KEY, "")!!
                 .split(",")
                 .filter { !it.isBlank() }
                 .toMutableList()
@@ -59,6 +59,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun connectToServer(server: String) {
+        //always put last server at top
+        servers.remove(server)
+        servers.add(0, server)
+
         val intent = Intent(this, ControlActivity::class.java)
         intent.putExtra("serverAddress", server)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -76,7 +80,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if(requestCode == REQUEST_QR_CODE && resultCode == Activity.RESULT_OK) {
-            addServerAddress(data!!.getStringExtra("serverAddress"))
+            validateAddressAndConnect(data!!.getStringExtra("serverAddress"))
         }
     }
 
@@ -89,13 +93,13 @@ class MainActivity : AppCompatActivity() {
             .setView(body)
             .setPositiveButton(R.string.ok) { dialog, _ ->
                 dialog.dismiss()
-                addServerAddress(serverAddress.text.toString())
+                validateAddressAndConnect(serverAddress.text.toString())
             }
             .setNegativeButton(R.string.cancel) { dialog, _ -> dialog.cancel() }
             .show()
     }
 
-    private fun addServerAddress(text: String) {
+    private fun validateAddressAndConnect(text: String) {
         val url = if (!text.startsWith("http://") && !text.startsWith("https://")) {
             "http://$text"
         } else {
@@ -103,9 +107,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (Patterns.WEB_URL.matcher(url).matches()) {
-            if(!servers.contains(url)) {
-                servers.add(0, url)
-            }
             connectToServer(url)
         } else {
             Toast.makeText(this, "Invalid url", Toast.LENGTH_SHORT).show()

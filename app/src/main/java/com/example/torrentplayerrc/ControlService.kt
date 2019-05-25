@@ -292,6 +292,7 @@ class ControlService: Service() {
 
         if(lastImageUrl != imageUrl) {
             lastImageUrl = imageUrl
+            lastImage = null
             GlobalScope.launch(newFixedThreadPoolContext(1, "Load Image Thread")) {
                 // load video poster
                lastImage = imageUrl?.let {
@@ -311,7 +312,7 @@ class ControlService: Service() {
                     }
                 }
 
-                if (lastDeviceId != null)
+                if (lastDeviceId != null && lastImageUrl == imageUrl)
                     showNotification(isPlaying, artist, track, lastImage, currentFileIndex, files)
             }
         }
@@ -387,23 +388,29 @@ class ControlService: Service() {
         activityIntent.putExtra("serverAddress", serverAddress)
         builder.setContentIntent(PendingIntent.getActivity(applicationContext, 0, activityIntent, PendingIntent.FLAG_UPDATE_CURRENT))
 
+        var startIndex = 0
+        if (currentFileIndex != 0) {
+            startIndex = 1
+            builder.addAction(createMediaAction(android.R.drawable.ic_media_previous, KeyEvent.KEYCODE_MEDIA_NEXT))
+        }
+
         builder.addAction(createMediaAction(android.R.drawable.ic_media_rew, KeyEvent.KEYCODE_MEDIA_REWIND))
+
         if (isPlaying) {
             builder.addAction(createMediaAction(android.R.drawable.ic_media_pause, KeyEvent.KEYCODE_MEDIA_PAUSE))
         } else {
             builder.addAction(createMediaAction(android.R.drawable.ic_media_play, KeyEvent.KEYCODE_MEDIA_PLAY))
         }
+
         builder.addAction(createMediaAction(android.R.drawable.ic_media_ff, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD))
 
         if (currentFileIndex < files.length() - 1) {
             builder.addAction(createMediaAction(android.R.drawable.ic_media_next, KeyEvent.KEYCODE_MEDIA_NEXT))
         }
 
-        builder.addAction(createMediaAction(android.R.drawable.ic_menu_close_clear_cancel, KeyEvent.KEYCODE_MEDIA_STOP))
-
         builder.style = Notification.MediaStyle()
             .setMediaSession(mediaSession.sessionToken)
-            .setShowActionsInCompactView(0, 1, 2)
+            .setShowActionsInCompactView(*(startIndex..startIndex+3).toList().toIntArray()) // kotlin magic
 
         return builder.build()
     }
