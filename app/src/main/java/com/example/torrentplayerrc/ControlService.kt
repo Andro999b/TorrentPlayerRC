@@ -61,8 +61,8 @@ class ControlService: Service() {
 
     override fun onCreate() {
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                notificationManager.getNotificationChannel(NOTIFICATION_CHANNEL_ID) == null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            notificationManager.getNotificationChannel(NOTIFICATION_CHANNEL_ID) == null) {
 
             val notificationChannel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
