@@ -92,11 +92,11 @@ class ControlService: Service() {
             }
 
             override fun onFastForward() {
-                skip(10.0)
+                skip(30.0)
             }
 
             override fun onRewind() {
-                skip(-10.0)
+                skip(-30.0)
             }
 
             override fun onStop() { // close device on stop
