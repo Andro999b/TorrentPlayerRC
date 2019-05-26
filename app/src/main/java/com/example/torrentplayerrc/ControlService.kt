@@ -391,7 +391,7 @@ class ControlService: Service() {
         var startIndex = 0
         if (currentFileIndex != 0) {
             startIndex = 1
-            builder.addAction(createMediaAction(android.R.drawable.ic_media_previous, KeyEvent.KEYCODE_MEDIA_NEXT))
+            builder.addAction(createMediaAction(android.R.drawable.ic_media_previous, KeyEvent.KEYCODE_MEDIA_PREVIOUS))
         }
 
         builder.addAction(createMediaAction(android.R.drawable.ic_media_rew, KeyEvent.KEYCODE_MEDIA_REWIND))

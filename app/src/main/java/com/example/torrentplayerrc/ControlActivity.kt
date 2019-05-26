@@ -100,6 +100,7 @@ class ControlActivity : AppCompatActivity() {
                         R.string.fail_to_load_page,
                         Toast.LENGTH_LONG
                     ).show()
+                    cancelConnection()
                 }
             }
         }
