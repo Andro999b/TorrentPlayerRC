@@ -1,5 +1,6 @@
 package com.example.torrentplayerrc
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
@@ -16,6 +17,14 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
 import io.ktor.client.request.get
 import kotlinx.coroutines.*
+import android.app.DownloadManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Environment.DIRECTORY_DOWNLOADS
+import android.webkit.URLUtil
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 
 class ControlActivity : AppCompatActivity() {
@@ -56,6 +65,7 @@ class ControlActivity : AppCompatActivity() {
         webView.settings.javaScriptEnabled = true
         webView.addJavascriptInterface(this, "mobileApp")
 
+
         this.onNewIntent(intent)
     }
 
@@ -75,7 +85,7 @@ class ControlActivity : AppCompatActivity() {
         webView.loadUrl("about:blank")
         webView.visibility = View.INVISIBLE
 
-        loadPageJob = GlobalScope.launch(newFixedThreadPoolContext(1, "Load Page Thread")) {
+        loadPageJob = GlobalScope.launch {
             try {
                 HttpClient(Android) {
                     engine {
@@ -164,5 +174,28 @@ class ControlActivity : AppCompatActivity() {
     @JavascriptInterface
     fun disconnectDevice(){
         controlServiceBinder.getService().disconnectDevice()
+    }
+
+    @JavascriptInterface
+    fun downloadFile(url: String, name: String) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 1)
+        } else {
+            val request = DownloadManager.Request(Uri.parse(url))
+
+            request.allowScanningByMediaScanner()
+            //Notify client once download is completed!
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            request.setDestinationInExternalPublicDir(DIRECTORY_DOWNLOADS, name)
+
+            val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            dm.enqueue(request)
+
+            //To notify the Client that the file is being downloaded
+            Toast.makeText(
+                applicationContext, "Downloading $name",
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 }

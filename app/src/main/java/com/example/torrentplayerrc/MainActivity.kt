@@ -21,6 +21,7 @@ import androidx.recyclerview.widget.RecyclerView
 
 const val SERVERS_KEY = "servers"
 const val REQUEST_QR_CODE = 1
+const val REQUEST_CAMERA_CODE = 2
 
 class MainActivity : AppCompatActivity() {
     private lateinit var preferences: SharedPreferences
@@ -70,15 +71,30 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun onQRScanner(view: View) {
+        // check camera permission and go to qr scanner
         if (ContextCompat.checkSelfPermission(this, permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(permission.CAMERA), 1)
+            ActivityCompat.requestPermissions(this, arrayOf(permission.CAMERA), REQUEST_CAMERA_CODE)
         } else {
-            val intent = Intent(this, QRScannerActivity::class.java)
-            startActivityForResult(intent, REQUEST_QR_CODE)
+            goToQRScanner()
         }
     }
 
+    // handle request camera permission
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if(requestCode == REQUEST_CAMERA_CODE) {
+                goToQRScanner()
+            }
+        }
+    }
+
+    private fun goToQRScanner() {
+        val intent = Intent(this, QRScannerActivity::class.java)
+        startActivityForResult(intent, REQUEST_QR_CODE)
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        // got result from qr scanner
         if(requestCode == REQUEST_QR_CODE && resultCode == Activity.RESULT_OK) {
             validateAddressAndConnect(data!!.getStringExtra("serverAddress"))
         }

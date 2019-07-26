@@ -74,6 +74,7 @@ class ControlService: Service() {
         }
 
         mediaSession = MediaSession(applicationContext, "TorrentPlayerRC")
+        // setup media controls callback
         mediaSession.setCallback(object: MediaSession.Callback() {
             override fun onPause() {
                 createAndSendDeviceAction("pause")
@@ -147,11 +148,11 @@ class ControlService: Service() {
             connect()
             on("disconnect") {
                 val reason = it[0] as String
-                when(reason) {
-                    "io server disconnect" -> stopActivityAndClean()
-                    "transport error" -> stopActivityAndClean()
+                when {
+                    reason.contains("server") -> stopActivityAndClean()
+                    reason.contains("transport") -> stopActivityAndClean()
                 }
-                Log.i("socket","disconnect: ${reason}")
+                Log.i("socket","disconnect: $reason")
             }
             on("reconnect_failed") {
                 stopActivityAndClean()
@@ -293,7 +294,8 @@ class ControlService: Service() {
         if(lastImageUrl != imageUrl) {
             lastImageUrl = imageUrl
             lastImage = null
-            GlobalScope.launch(newFixedThreadPoolContext(1, "Load Image Thread")) {
+            // load image in separated thread
+            GlobalScope.launch {
                 // load video poster
                lastImage = imageUrl?.let {
                     try {
@@ -310,8 +312,9 @@ class ControlService: Service() {
                         Log.e("Fail to load poster", ex.message)
                         null
                     }
-                }
+               }
 
+                // check if image still need(during image loading, user may start watch other playlist)
                 if (lastDeviceId != null && lastImageUrl == imageUrl)
                     showNotification(isPlaying, artist, track, lastImage, currentFileIndex, files)
             }
