@@ -104,13 +104,15 @@ class ControlActivity : AppCompatActivity() {
                     }
                 }
             } catch (ex: Exception) {
-                runOnUiThread {
-                    Toast.makeText(
-                        this@ControlActivity,
-                        R.string.fail_to_load_page,
-                        Toast.LENGTH_LONG
-                    ).show()
-                    cancelConnection()
+                if(isActive) {
+                    runOnUiThread {
+                        Toast.makeText(
+                            this@ControlActivity,
+                            R.string.fail_to_load_page,
+                            Toast.LENGTH_LONG
+                        ).show()
+                        cancelConnection()
+                    }
                 }
             }
         }

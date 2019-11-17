@@ -55,9 +55,8 @@ class ControlService: Service() {
     private var lastDeviceState: JSONObject? = null
     private var lastDevicesList: JSONArray? = null
     private var lastImageUrl: String? = null
-    @Volatile
     private var lastImage: Bitmap? = null
-    private var notificationJob: Job? = null
+    private var loadImageJob: Job? = null
 
     override fun onCreate() {
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -224,11 +223,9 @@ class ControlService: Service() {
         lastDeviceId = null
         lastDeviceState = null
         lastDevicesList = null
-        lastImageUrl = null
-        lastImage = null
         mediaSession.isActive = true
-        notificationJob?.cancel()
-        notificationJob = null
+        loadImageJob?.cancel()
+        loadImageJob = null
         stopForeground(true)
     }
 
@@ -294,8 +291,9 @@ class ControlService: Service() {
         if(lastImageUrl != imageUrl) {
             lastImageUrl = imageUrl
             lastImage = null
+            loadImageJob?.cancel()
             // load image in separated thread
-            GlobalScope.launch {
+            loadImageJob = GlobalScope.launch {
                 // load video poster
                lastImage = imageUrl?.let {
                     try {
@@ -315,7 +313,7 @@ class ControlService: Service() {
                }
 
                 // check if image still need(during image loading, user may start watch other playlist)
-                if (lastDeviceId != null && lastImageUrl == imageUrl)
+                if (lastDeviceId != null && isActive)
                     showNotification(isPlaying, artist, track, lastImage, currentFileIndex, files)
             }
         }
