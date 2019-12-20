@@ -121,9 +121,6 @@ class ControlActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         unbindService(serviceConnection)
-        serverAddress = null
-        loadPageJob?.cancel()
-        loadPageJob = null
     }
 
     override fun onBackPressed() {
@@ -138,6 +135,9 @@ class ControlActivity : AppCompatActivity() {
     private fun cancelConnection() {
         startActivity(Intent(this, MainActivity::class.java))
         finish()
+        serverAddress = null
+        loadPageJob?.cancel()
+        loadPageJob = null
     }
 
     private fun sendJSCommand(command: String, data: Any?) {
